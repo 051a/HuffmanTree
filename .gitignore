@@ -1,0 +1,33 @@
+# Visual Studio
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.db
+*.db-shm
+*.db-wal
+*.ipch
+*.recipe
+*.tlog/
+*.lastbuildstate
+*.idb
+*.pdb
+*.ilk
+*.log
+Browse.VC.db
+Solution.VC.db
+DocumentLayout.json
+DocumentLayout.backup.json
+
+# CLion / JetBrains
+.idea/
+
+# Executables
+*.exe
+
+# macOS
+.DS_Store
+
+# Temporary files
+~$*

@@ -35,7 +35,7 @@ DocumentLayout.backup.json
 # Local files (not for GitHub)
 .claude/
 CLAUDE.md
-对话记录-*.jsonl
+对话记录/
 *.doc
 *.docx
 *.pptx

@@ -31,3 +31,11 @@ DocumentLayout.backup.json
 
 # Temporary files
 ~$*
+
+# Local files (not for GitHub)
+.claude/
+CLAUDE.md
+对话记录-*.jsonl
+*.doc
+*.docx
+*.pptx

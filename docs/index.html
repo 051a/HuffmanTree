@@ -140,10 +140,6 @@
             <section class="feature-card">
                 <div class="feature-header">
                     <h3>🔓 功能二：解码 01 编码串</h3>
-                    <div class="decode-mode-toggle">
-                        <button id="btnDecodeInstant" class="mini-toggle active">⚡ 即时</button>
-                        <button id="btnDecodeAnim" class="mini-toggle">🎬 动画</button>
-                    </div>
                 </div>
                 <div class="feature-body">
                     <div class="input-group">
@@ -153,22 +149,6 @@
                         <button id="btnDecode" class="btn btn-primary">解码</button>
                     </div>
                     <p id="decodeHint" class="hint"></p>
-
-                    <!-- 动画速度控制 -->
-                    <div id="decodeAnimSpeed" class="decode-speed hidden">
-                        <span>动画速度</span>
-                        <input type="range" id="decodeSpeedSlider" min="1" max="10" value="6" step="1">
-                        <button id="btnDecodeStop" class="btn btn-sm btn-danger hidden">停止</button>
-                    </div>
-
-                    <!-- 动画过程中显示的步骤信息 -->
-                    <div id="decodeAnimStatus" class="result-box hidden">
-                        <div class="decode-anim-status">
-                            <span class="anim-current-bit" id="animCurrentBit"></span>
-                            <span class="anim-current-char" id="animCurrentChar"></span>
-                        </div>
-                        <div class="decode-anim-result" id="animAccumResult"></div>
-                    </div>
 
                     <!-- 解码结果 -->
                     <div id="decodeResult" class="result-box hidden">
@@ -204,10 +184,6 @@
     let dragStartX = 0, dragStartY = 0;
     let dragTarget = null;  // 当前拖拽的目标配置
 
-    // 解码动画状态
-    let decodeAnimating = false;
-    let decodeAnimTimer = null;
-    let decodeMode = 'instant';   // 'instant' | 'anim'
 
     // 高亮状态
     let highlightedLeaf = -1;     // 当前高亮的叶子下标, -1 表示无
@@ -263,10 +239,6 @@
             if (e.key === 'Enter') doDecode();
         }).addEventListener('input', e => validateDecodeInput(e.target.value));
 
-        document.getElementById('btnDecodeInstant').addEventListener('click', () => setDecodeMode('instant'));
-        document.getElementById('btnDecodeAnim').addEventListener('click', () => setDecodeMode('anim'));
-        document.getElementById('decodeSpeedSlider').addEventListener('input', () => {});
-        document.getElementById('btnDecodeStop').addEventListener('click', stopDecodeAnim);
     }
 
     /* ================================================================
@@ -966,9 +938,6 @@
        树视图切换
        ================================================================ */
     function switchTreeView(mode) {
-        // 停止正在进行的解码动画
-        if (decodeAnimating) stopDecodeAnim();
-
         const svgC = document.getElementById('svgTreeContainer');
         const txtC = document.getElementById('textTreeContainer');
         const bldC = document.getElementById('buildAnimContainer');
@@ -1004,21 +973,11 @@
     }
 
     /* ================================================================
-       解码逻辑 (即时 / 动画)
+       解码
        ================================================================ */
-    function setDecodeMode(mode) {
-        decodeMode = mode;
-        document.getElementById('btnDecodeInstant').classList.toggle('active', mode === 'instant');
-        document.getElementById('btnDecodeAnim').classList.toggle('active', mode === 'anim');
-        document.getElementById('decodeAnimSpeed').classList.toggle('hidden', mode !== 'anim');
-        document.getElementById('btnDecode').textContent = mode === 'anim' ? '开始动画解码' : '解码';
-    }
-
     function doDecode() {
-        stopDecodeAnim();
         const input = document.getElementById('inputDecode').value.trim();
         document.getElementById('decodeResult').classList.add('hidden');
-        document.getElementById('decodeAnimStatus').classList.add('hidden');
 
         if (input === '') {
             showDecodeError('请输入01编码串!');
@@ -1026,19 +985,15 @@
         }
 
         if (!/^[01\s]+$/.test(input)) {
-            showDecodeError('❌ 解码失败 - 输入包含非0/1字符!');
+            showDecodeError('解码失败 - 输入包含非0/1字符!');
             return;
         }
 
-        if (decodeMode === 'anim') {
-            startDecodeAnim(input);
+        const { success, error, result } = ht.decode(input);
+        if (success) {
+            showDecodeResult(result, input);
         } else {
-            const { success, error, result } = ht.decode(input);
-            if (success) {
-                showDecodeResult(result, input);
-            } else {
-                showDecodeError(error);
-            }
+            showDecodeError(error);
         }
     }
 
@@ -1060,157 +1015,6 @@
             <p class="decode-length">共解码出 <strong>${result.length}</strong> 个字符</p>
         `;
         box.classList.remove('hidden');
-    }
-
-    /* ================================================================
-       解码路径动画
-       ================================================================ */
-    function startDecodeAnim(input) {
-        const { steps, valid, error } = ht.decodeSteps(input);
-        if (!valid) {
-            showDecodeError(error);
-            return;
-        }
-
-        decodeAnimating = true;
-        document.getElementById('btnDecodeStop').classList.remove('hidden');
-        document.getElementById('decodeResult').classList.add('hidden');
-
-        // 先渲染一个干净的 SVG 树
-        renderSvgTree(ht, 'svgTree', false);
-        // 确保切换到图形树视图
-        if (!document.getElementById('svgTreeContainer').classList.contains('active')) {
-            switchTreeView('svg');
-        }
-
-        const statusBox = document.getElementById('decodeAnimStatus');
-        const currentBitEl = document.getElementById('animCurrentBit');
-        const currentCharEl = document.getElementById('animCurrentChar');
-        const accumResultEl = document.getElementById('animAccumResult');
-        statusBox.classList.remove('hidden');
-
-        currentBitEl.textContent = '● 起始: 根节点';
-        currentCharEl.textContent = '';
-        accumResultEl.innerHTML = '<span class="anim-label">已解码: </span>';
-
-        // 高亮根节点
-        highlightAnimNode(ht.m - 1, 'anim-root');
-
-        let stepIdx = 0;
-        const speed = 1200 - (parseInt(document.getElementById('decodeSpeedSlider').value) - 1) * 110;
-
-        function nextStep() {
-            if (!decodeAnimating || stepIdx >= steps.length) {
-                // 动画完成
-                finishDecodeAnim(steps, input);
-                return;
-            }
-
-            const step = steps[stepIdx];
-            const prevNode = stepIdx === 0 ? ht.m - 1 : steps[stepIdx - 1].to;
-            // 如果上一步到达了叶子，prevNode 会是叶子节点，但从根重新开始
-            if (stepIdx > 0 && steps[stepIdx - 1].reachedLeaf) {
-                // 清除之前的路径高亮
-                clearAnimHighlight();
-                highlightAnimNode(ht.m - 1, 'anim-root');
-            }
-
-            // 清除上一个节点的普通高亮 (保留根)
-            if (stepIdx > 0 && !steps[stepIdx - 1].reachedLeaf) {
-                unhighlightAnimNode(prevNode);
-            }
-
-            // 高亮当前步骤
-            currentBitEl.textContent = `● 第 ${stepIdx + 1} 位: 读入 "${step.bit}" → ${step.bit === '0' ? '左' : '右'}移`;
-
-            // 高亮经过的边
-            highlightAnimEdge(step.from, step.to, step.bit);
-
-            if (step.reachedLeaf) {
-                // 高亮叶子节点
-                highlightAnimNode(step.to, 'anim-leaf');
-                const displayCh = step.outputChar === ' ' ? '␣' : step.outputChar;
-                currentCharEl.innerHTML = `✨ 解码: <strong>${displayCh}</strong>`;
-                accumResultEl.innerHTML += displayCh;
-            } else {
-                highlightAnimNode(step.to, 'anim-current');
-                currentCharEl.textContent = '';
-            }
-
-            stepIdx++;
-            decodeAnimTimer = setTimeout(nextStep, step.reachedLeaf ? speed * 1.5 : speed);
-        }
-
-        decodeAnimTimer = setTimeout(nextStep, 300);  // 初始延迟
-    }
-
-    function highlightAnimNode(nodeIdx, cls) {
-        const svg = document.getElementById('svgTree');
-        const nodeGroup = svg.querySelector(`.node-${nodeIdx}`);
-        if (!nodeGroup) return;
-        const ring = nodeGroup.querySelector('.node-ring');
-        if (ring) {
-            ring.setAttribute('stroke', cls === 'anim-leaf' ? '#16a34a' : cls === 'anim-root' ? '#2563eb' : '#f97316');
-            ring.setAttribute('stroke-width', '4');
-        }
-        if (cls === 'anim-leaf') {
-            const circle = nodeGroup.querySelector('.node-circle');
-            if (circle) circle.setAttribute('filter', 'url(#glowStrong)');
-        }
-    }
-
-    function unhighlightAnimNode(nodeIdx) {
-        const svg = document.getElementById('svgTree');
-        const nodeGroup = svg.querySelector(`.node-${nodeIdx}`);
-        if (!nodeGroup) return;
-        const ring = nodeGroup.querySelector('.node-ring');
-        if (ring) {
-            ring.setAttribute('stroke', 'transparent');
-            ring.setAttribute('stroke-width', '3');
-        }
-        const circle = nodeGroup.querySelector('.node-circle');
-        if (circle) circle.setAttribute('filter', 'url(#shadow)');
-    }
-
-    function highlightAnimEdge(from, to, side) {
-        const svg = document.getElementById('svgTree');
-        const edgeGroup = svg.querySelector(`.edge-${from}-${to}`);
-        if (!edgeGroup) return;
-        const bg = edgeGroup.querySelector('.edge-bg');
-        if (bg) bg.setAttribute('stroke', side === '0' ? '#f59e0b' : '#8b5cf6');
-    }
-
-    function clearAnimHighlight() {
-        const svg = document.getElementById('svgTree');
-        // 清除所有节点环
-        svg.querySelectorAll('.node-ring').forEach(r => { r.setAttribute('stroke', 'transparent'); r.setAttribute('stroke-width', '3'); });
-        // 清除所有边背景
-        svg.querySelectorAll('.edge-bg').forEach(bg => bg.setAttribute('stroke', 'transparent'));
-        // 恢复所有圆
-        svg.querySelectorAll('.node-circle').forEach(c => c.setAttribute('filter', 'url(#shadow)'));
-    }
-
-    function finishDecodeAnim(steps, input) {
-        decodeAnimating = false;
-        document.getElementById('btnDecodeStop').classList.add('hidden');
-        document.getElementById('decodeAnimStatus').classList.add('hidden');
-        clearAnimHighlight();
-
-        // 重构完整的结果
-        let result = '';
-        steps.forEach(s => { if (s.reachedLeaf) result += s.outputChar; });
-        showDecodeResult(result, input);
-
-        // 重新渲染带点击事件的SVG
-        renderSvgTree(ht, 'svgTree', true);
-    }
-
-    function stopDecodeAnim() {
-        decodeAnimating = false;
-        if (decodeAnimTimer) clearTimeout(decodeAnimTimer);
-        document.getElementById('btnDecodeStop').classList.add('hidden');
-        clearAnimHighlight();
-        renderSvgTree(ht, 'svgTree', true);
     }
 
     /* ================================================================

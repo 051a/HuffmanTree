@@ -95,10 +95,22 @@ class HuffmanTree {
         return [s1, s2];
     }
 
-    /* ============ 创建哈夫曼树 ============ */
+    /* ============ 创建哈夫曼树 (同时记录构建步骤) ============ */
     buildTree() {
+        this.steps = [];  // 记录 26 步合并历史，供动画使用
         for (let i = this.n; i < this.m; i++) {
             const [s1, s2] = this.select(i);
+
+            // 记录构建步骤
+            this.steps.push({
+                step:      i - this.n + 1,
+                s1:        s1,
+                s2:        s2,
+                s1Weight:  this.nodes[s1].weight,
+                s2Weight:  this.nodes[s2].weight,
+                newNode:   i,
+                newWeight: this.nodes[s1].weight + this.nodes[s2].weight
+            });
 
             this.nodes[s1].parent = i;
             this.nodes[s2].parent = i;
@@ -330,5 +342,88 @@ class HuffmanTree {
             n: this.n,
             m: this.m
         };
+    }
+
+    /* ============ 获取叶子到根的路径 (用于点击联动高亮) ============ */
+    getLeafPath(leafIdx) {
+        const pathNodes = [];   // 从叶子到根的节点序列
+        const pathEdges = [];   // 从叶子到根的边序列
+        let cur = leafIdx;
+
+        while (cur !== -1) {
+            pathNodes.push(cur);
+            const par = this.nodes[cur].parent;
+            if (par !== -1) {
+                const side = this.nodes[par].lchild === cur ? '0' : '1';
+                pathEdges.push({ from: par, to: cur, side: side });
+            }
+            cur = par;
+        }
+
+        return { nodes: pathNodes, edges: pathEdges };
+    }
+
+    /* ============ 逐位解码 (返回每步信息，用于路径动画) ============ */
+    decodeSteps(binaryStr) {
+        const cleaned = binaryStr.replace(/\s/g, '');
+        const steps = [];
+        const root = this.m - 1;
+        let current = root;
+        let valid = true;
+        let error = '';
+
+        if (cleaned.length === 0) {
+            return { steps, valid: false, error: '输入为空!' };
+        }
+
+        // 校验输入
+        if (!/^[01]+$/.test(cleaned)) {
+            return { steps, valid: false, error: '解码失败 - 输入包含非0/1字符!' };
+        }
+
+        for (let i = 0; i < cleaned.length; i++) {
+            const bit = cleaned[i];
+            const from = current;
+
+            if (bit === '0') {
+                current = this.nodes[current].lchild;
+            } else {
+                current = this.nodes[current].rchild;
+            }
+
+            if (current === -1) {
+                return { steps, valid: false, error: '解码失败 - 遇到无效编码路径!' };
+            }
+
+            let outputChar = null;
+            if (current < this.n) {
+                // 到达叶子结点
+                outputChar = this.nodes[current].ch;
+                steps.push({
+                    bit:         bit,
+                    from:        from,
+                    to:          current,
+                    reachedLeaf: true,
+                    outputChar:  outputChar,
+                    leafIdx:     current
+                });
+                current = root;  // 回到根，准备解码下一个字符
+            } else {
+                steps.push({
+                    bit:         bit,
+                    from:        from,
+                    to:          current,
+                    reachedLeaf: false,
+                    outputChar:  null,
+                    leafIdx:     -1
+                });
+            }
+        }
+
+        if (current !== root) {
+            return { steps, valid: false, error: '解码失败 - 编码串不完整，剩余位不足以构成完整字符!' };
+        }
+
+        return { steps, valid: true, error: '' };
     }
 }

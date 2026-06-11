@@ -312,9 +312,13 @@ body {
 }
 
 .feature-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 14px 20px;
     border-bottom: 1px solid var(--border);
     background: var(--border-light);
+    gap: 12px;
 }
 
 .feature-header h3 {
@@ -602,4 +606,338 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
+}
+
+/* ================================================================
+   新增: 构建动画控制栏
+   ================================================================ */
+
+.build-controls {
+    padding: 16px 20px 12px;
+    border-top: 1px solid var(--border);
+    background: #fafbfc;
+}
+
+.build-step-indicator {
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    min-height: 22px;
+    transition: color 0.3s;
+}
+
+.build-progress {
+    height: 6px;
+    background: var(--border-light);
+    border-radius: 3px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.build-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), #8b5cf6);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.build-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.btn-icon {
+    width: 40px;
+    height: 40px;
+    border: 1.5px solid var(--border);
+    border-radius: 50%;
+    background: var(--bg-card);
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    color: var(--text-secondary);
+}
+
+.btn-icon:hover:not(:disabled) {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.btn-icon:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.btn-icon.btn-play {
+    width: 48px;
+    height: 48px;
+    font-size: 1.2rem;
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.btn-icon.btn-play:hover {
+    background: var(--primary-dark);
+}
+
+.btn-icon.btn-play.playing {
+    background: #f97316;
+    border-color: #f97316;
+    animation: pulse-play 1.5s infinite;
+}
+
+@keyframes pulse-play {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); }
+    50%      { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); }
+}
+
+.build-speed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.build-speed input[type="range"] {
+    width: 140px;
+    accent-color: var(--primary);
+}
+
+#buildAnimSvgWrapper {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 400px;
+    text-align: center;
+}
+
+#buildAnimSvg {
+    display: block;
+    margin: 0 auto;
+}
+
+/* ================================================================
+   新增: SVG 动画节点样式
+   ================================================================ */
+
+/* 构建动画 - 正在合并的高亮节点 */
+.build-node-highlight {
+    animation: pulse-highlight 0.8s infinite alternate;
+}
+
+@keyframes pulse-highlight {
+    from { filter: url(#bshadow); }
+    to   { filter: url(#bshadow) drop-shadow(0 0 8px rgba(249,115,22,0.7)); }
+}
+
+/* 构建动画 - 新创建的节点渐入 */
+.build-node-new {
+    animation: fade-in-node 0.4s ease-out;
+}
+
+@keyframes fade-in-node {
+    from { opacity: 0; transform-origin: center; }
+    to   { opacity: 1; }
+}
+
+/* 构建动画 - 新连线 */
+.build-edge-new {
+    animation: draw-edge 0.4s ease-out;
+}
+
+@keyframes draw-edge {
+    from { stroke-dasharray: 100; stroke-dashoffset: 100; }
+    to   { stroke-dashoffset: 0; }
+}
+
+/* ================================================================
+   新增: 解码模式切换
+   ================================================================ */
+
+.decode-mode-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+}
+
+.mini-toggle {
+    padding: 4px 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    transition: all 0.2s;
+}
+
+.mini-toggle.active {
+    background: var(--bg-card);
+    color: var(--primary);
+    box-shadow: var(--shadow);
+    font-weight: 600;
+}
+
+.mini-toggle:hover:not(.active) {
+    color: var(--text-primary);
+}
+
+/* 解码动画速度控制 */
+.decode-speed {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.decode-speed input[type="range"] {
+    width: 120px;
+    accent-color: var(--primary);
+}
+
+.btn-sm {
+    padding: 5px 14px;
+    font-size: 0.78rem;
+    border-radius: var(--radius-sm);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+}
+
+/* 解码动画状态 */
+.decode-anim-status {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.anim-current-bit {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--primary);
+    font-size: 0.9rem;
+}
+
+.anim-current-char {
+    font-weight: 600;
+    color: var(--success);
+    font-size: 1rem;
+    animation: char-pop 0.3s ease-out;
+}
+
+@keyframes char-pop {
+    from { transform: scale(1.3); }
+    to   { transform: scale(1); }
+}
+
+.decode-anim-result {
+    margin-top: 8px;
+    padding: 10px;
+    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    min-height: 36px;
+    color: var(--text-primary);
+    word-break: break-all;
+    letter-spacing: 1px;
+}
+
+.anim-label {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-family: var(--font-sans);
+}
+
+/* ================================================================
+   新增: 点击联动 - 表行高亮
+   ================================================================ */
+
+#codeTable tbody tr {
+    cursor: pointer;
+}
+
+#codeTable tbody tr.row-highlight {
+    background: #fef3c7 !important;
+    box-shadow: inset 4px 0 0 var(--warning);
+    font-weight: 600;
+}
+
+#codeTable tbody tr.row-highlight td {
+    color: var(--text-primary);
+}
+
+/* SVG 树节点悬停提示 */
+.node-group[data-node-idx] .node-circle:hover {
+    cursor: default;
+}
+
+.node-group[data-node-idx] .node-circle[style*="pointer"]:hover,
+.node-group[data-node-idx] .node-circle:hover {
+    cursor: pointer;
+}
+
+/* ================================================================
+   新增: 徽章提示
+   ================================================================ */
+
+.badge-static {
+    background: var(--purple-light);
+    color: var(--purple);
+}
+
+/* 表头提示（联动说明） */
+.panel-header .badge {
+    animation: fade-in-badge 0.6s ease-out;
+}
+
+@keyframes fade-in-badge {
+    from { opacity: 0; transform: translateX(10px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ================================================================
+   新增: SVG 边高亮过渡
+   ================================================================ */
+
+.edge-bg {
+    transition: stroke 0.3s, stroke-opacity 0.3s;
+}
+
+.edge-fg {
+    transition: stroke 0.3s, stroke-width 0.3s, stroke-opacity 0.3s;
+}
+
+.node-ring {
+    transition: stroke 0.3s, stroke-width 0.3s, r 0.3s;
+}
+
+.node-circle {
+    transition: filter 0.3s;
 }

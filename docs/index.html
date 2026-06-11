@@ -227,7 +227,6 @@
         renderTextTree(ht);
         renderBuildAnimSvg(ht, 0);  // 初始状态
         bindEvents();
-        setupZoom();
     });
 
     function bindEvents() {
@@ -349,9 +348,6 @@
             html += '\n';
         });
         document.getElementById('textTree').innerHTML = html;
-        // 重置文本树缩放
-        const st = zoomStates['textTreeWrapper'];
-        if (st) st.reset();
     }
 
     /* ================================================================
@@ -673,18 +669,12 @@
     /* ================================================================
        缩放/拖拽 — 每个区域独立简单实现
        ================================================================ */
-    // 状态变量 (在 DOMContentLoaded 中初始化)
-    let svgZ, svgVx, svgVy, svgBw, svgBh, svgEl, svgWr, svgInd;
-    let bldZ, bldVx, bldVy, bldBw, bldBh, bldEl, bldWr, bldInd;
-    let txtZ, txtPx, txtPy, txtEl, txtWr, txtInd;
-
-    function setupZoom() {
+    (function setupZoom() {
         // ===== 图形树 SVG =====
-        svgZ = 1; svgVx = 0; svgVy = 0; svgBw = 0; svgBh = 0;
-        svgEl = document.getElementById('svgTree');
-        svgWr = document.getElementById('svgTreeWrapper');
-        svgInd = document.getElementById('svgZoomIndicator');
-        if (!svgEl || !svgWr) return;
+        let svgZ = 1, svgVx = 0, svgVy = 0, svgBw = 0, svgBh = 0;
+        const svgEl = document.getElementById('svgTree');
+        const svgWr = document.getElementById('svgTreeWrapper');
+        const svgInd = document.getElementById('svgZoomIndicator');
 
         function svgInit() {
             const vb = svgEl.getAttribute('viewBox');
@@ -891,16 +881,14 @@
         window._resetSvgZoom = () => { svgZ=1; svgVx=0; svgVy=0; svgInit(); svgApply(); };
         window._resetBldZoom = () => { bldZ=1; bldVx=0; bldVy=0; bldInit(); bldApply(); };
         window._resetTxtZoom = () => { txtZ=1; txtPx=0; txtPy=0; txtApply(); };
-    }
 
-    // 构建动画每次重渲染后更新 base 尺寸
-    const _origRenderBuild = renderBuildAnimSvg;
-    renderBuildAnimSvg = function(ht, step) {
-        _origRenderBuild(ht, step);
-        requestAnimationFrame(() => {
-            if (typeof bldInit === 'function') { bldInit(); bldApply(); }
-        });
-    };
+        // 构建动画每次重渲染后更新 base 尺寸
+        const _origRenderBuild = renderBuildAnimSvg;
+        renderBuildAnimSvg = function(ht, step) {
+            _origRenderBuild(ht, step);
+            requestAnimationFrame(() => { bldInit(); bldApply(); });
+        };
+    })();
 
     /* ================================================================
        构建动画控制

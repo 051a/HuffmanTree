@@ -321,6 +321,7 @@ body {
     user-select: none;
     cursor: grab;
     position: relative;
+    height: 420px;
 }
 
 .zoomable-wrapper:active {

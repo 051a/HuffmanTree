@@ -227,10 +227,6 @@
         renderTextTree(ht);
         renderBuildAnimSvg(ht, 0);  // 初始状态
         bindEvents();
-        // 绑定三个视图的缩放拖拽
-        bindSvgZoomPan('svgTreeWrapper', 'svgTree', 'svgZoomIndicator');
-        bindSvgZoomPan('buildAnimSvgWrapper', 'buildAnimSvg', 'buildZoomIndicator');
-        bindTextZoomPan('textTreeWrapper', 'textTree', 'textZoomIndicator');
     });
 
     function bindEvents() {
@@ -674,173 +670,228 @@
     }
 
     /* ================================================================
-       统一缩放/拖拽系统 (滚轮缩放, 拖拽平移)
+       缩放/拖拽 — 每个区域独立简单实现
        ================================================================ */
+    (function setupZoom() {
+        // ===== 图形树 SVG =====
+        let svgZ = 1, svgVx = 0, svgVy = 0, svgBw = 0, svgBh = 0;
+        const svgEl = document.getElementById('svgTree');
+        const svgWr = document.getElementById('svgTreeWrapper');
+        const svgInd = document.getElementById('svgZoomIndicator');
 
-    const zoomStates = {};
-
-    function bindSvgZoomPan(wrapperId, svgId, indicatorId) {
-        const wrapper = document.getElementById(wrapperId);
-        const svg = document.getElementById(svgId);
-        const st = { zoom:1, vx:0, vy:0, bw:0, bh:0, svg, wrapper,
-                     indicator: document.getElementById(indicatorId), type:'svg' };
-        zoomStates[wrapperId] = st;
-
-        st.initBase = () => {
-            const vb = svg.getAttribute('viewBox');
-            if (vb) { const p = vb.split(' ').map(Number); st.bw = p[2]; st.bh = p[3]; }
-        };
-        st.apply = () => {
-            if (st.bw === 0) st.initBase();
-            if (st.bw === 0) return;
-            svg.setAttribute('viewBox', `${st.vx} ${st.vy} ${st.bw/st.zoom} ${st.bh/st.zoom}`);
-            showZoomIndicator(st);
-        };
-        st.clamp = () => {
-            const w = st.bw/st.zoom, h = st.bh/st.zoom;
-            st.vx = Math.max(0, Math.min(st.bw - w, st.vx));
-            st.vy = Math.max(0, Math.min(st.bh - h, st.vy));
-        };
-        st.reset = () => { st.zoom = 1; st.vx = 0; st.vy = 0; st.apply(); };
-        st.zoomBy = (delta) => {
-            const rect = wrapper.getBoundingClientRect();
-            if (rect.width === 0) return;
-            const mx = rect.width/2, my = rect.height/2;
-            const old = st.zoom;
-            st.zoom = Math.max(0.3, Math.min(5, old + delta));
-            if (st.zoom === old) return;
-            const sx = st.vx + (mx/rect.width) * (st.bw/old);
-            const sy = st.vy + (my/rect.height) * (st.bh/old);
-            st.vx = sx - (mx/rect.width) * (st.bw/st.zoom);
-            st.vy = sy - (my/rect.height) * (st.bh/st.zoom);
-            st.clamp();
-            st.apply();
-        };
-        st.initBase();
-
-        // 滚轮缩放 (阻止冒泡防止页面滚动)
-        wrapper.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const rect = wrapper.getBoundingClientRect();
-            if (rect.width === 0) return;
-            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-            const old = st.zoom;
-            st.zoom = Math.max(0.3, Math.min(5, old + (e.deltaY > 0 ? -0.15 : 0.15)));
-            if (st.zoom === old) return;
-            const sx = st.vx + (mx/rect.width) * (st.bw/old);
-            const sy = st.vy + (my/rect.height) * (st.bh/old);
-            st.vx = sx - (mx/rect.width) * (st.bw/st.zoom);
-            st.vy = sy - (my/rect.height) * (st.bh/st.zoom);
-            st.clamp();
-            st.apply();
-        }, { passive: false });
-
-        // 拖拽
-        wrapper.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return;
-            isDragging = true;
-            dragStartX = e.clientX;
-            dragStartY = e.clientY;
-            dragTarget = st;
-            dragTarget._startZoom = st.zoom;
-            dragTarget._startVx = st.vx;
-            dragTarget._startVy = st.vy;
-            e.preventDefault();
-        });
-
-        wrapper.addEventListener('dblclick', (e) => { e.preventDefault(); st.reset(); });
-    }
-
-    function bindTextZoomPan(wrapperId, contentId, indicatorId) {
-        const wrapper = document.getElementById(wrapperId);
-        const content = document.getElementById(contentId);
-        const st = { zoom:1, vx:0, vy:0, content, wrapper,
-                     indicator: document.getElementById(indicatorId), type:'text' };
-        zoomStates[wrapperId] = st;
-
-        st.apply = () => {
-            content.style.transform = `translate(${st.vx}px, ${st.vy}px) scale(${st.zoom})`;
-            content.style.transformOrigin = '0 0';
-            showZoomIndicator(st);
-        };
-        st.reset = () => { st.zoom = 1; st.vx = 0; st.vy = 0; st.apply(); };
-
-        wrapper.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const rect = wrapper.getBoundingClientRect();
-            if (rect.width === 0) return;
-            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-            const old = st.zoom;
-            st.zoom = Math.max(0.3, Math.min(5, old + (e.deltaY > 0 ? -0.15 : 0.15)));
-            st.vx = mx - (mx - st.vx) * (st.zoom/old);
-            st.vy = my - (my - st.vy) * (st.zoom/old);
-            st.apply();
-        }, { passive: false });
-
-        wrapper.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return;
-            isDragging = true;
-            dragStartX = e.clientX;
-            dragStartY = e.clientY;
-            dragTarget = st;
-            dragTarget._startZoom = st.zoom;
-            dragTarget._startVx = st.vx;
-            dragTarget._startVy = st.vy;
-            e.preventDefault();
-        });
-
-        wrapper.addEventListener('dblclick', (e) => { e.preventDefault(); st.reset(); });
-    }
-
-    function showZoomIndicator(st) {
-        const ind = st.indicator;
-        if (!ind) return;
-        ind.textContent = Math.round(st.zoom * 100) + '%';
-        ind.classList.add('visible');
-        clearTimeout(ind._timer);
-        ind._timer = setTimeout(() => ind.classList.remove('visible'), 1500);
-    }
-
-    // 全局拖拽
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging || !dragTarget) return;
-        const st = dragTarget;
-        const rect = st.wrapper.getBoundingClientRect();
-        if (rect.width === 0) return;
-        const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
-        if (st.type === 'text') {
-            st.vx = st._startVx + dx;
-            st.vy = st._startVy + dy;
-        } else {
-            const sx = (st.bw/st.zoom)/rect.width;
-            const sy = (st.bh/st.zoom)/rect.height;
-            st.vx = st._startVx - dx*sx;
-            st.vy = st._startVy - dy*sy;
-            if (st.clamp) st.clamp();
+        function svgInit() {
+            const vb = svgEl.getAttribute('viewBox');
+            if (vb) { const p = vb.split(' ').map(Number); svgBw = p[2]; svgBh = p[3]; }
         }
-        if (st.apply) st.apply();
-    });
+        function svgApply() {
+            if (svgBw === 0) svgInit();
+            if (svgBw === 0) return;
+            const w = svgBw / svgZ, h = svgBh / svgZ;
+            svgEl.setAttribute('viewBox', `${svgVx} ${svgVy} ${w} ${h}`);
+            svgInd.textContent = Math.round(svgZ * 100) + '%';
+            svgInd.classList.add('visible');
+            clearTimeout(svgInd._t);
+            svgInd._t = setTimeout(() => svgInd.classList.remove('visible'), 1200);
+        }
+        function svgClamp() {
+            const w = svgBw / svgZ, h = svgBh / svgZ;
+            svgVx = Math.max(0, Math.min(svgBw - w, svgVx));
+            svgVy = Math.max(0, Math.min(svgBh - h, svgVy));
+        }
+        svgInit();
 
-    document.addEventListener('mouseup', () => { isDragging = false; dragTarget = null; });
+        svgWr.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (svgBw === 0) svgInit();
+            const r = svgWr.getBoundingClientRect();
+            const mx = e.clientX - r.left, my = e.clientY - r.top;
+            const old = svgZ;
+            svgZ = Math.max(0.3, Math.min(5, old + (e.deltaY > 0 ? -0.15 : 0.15)));
+            const sx = svgVx + (mx / r.width) * (svgBw / old);
+            const sy = svgVy + (my / r.height) * (svgBh / old);
+            svgVx = sx - (mx / r.width) * (svgBw / svgZ);
+            svgVy = sy - (my / r.height) * (svgBh / svgZ);
+            svgClamp();
+            svgApply();
+        }, { passive: false });
 
-    // 工具栏按钮 — 直接操作 zoomStates
-    function zoomBuild(delta) {
-        const st = zoomStates['buildAnimSvgWrapper'];
-        if (!st) return;
-        st.zoomBy(delta);
-    }
-    document.getElementById('btnZoomIn').addEventListener('click', () => zoomBuild(0.2));
-    document.getElementById('btnZoomOut').addEventListener('click', () => zoomBuild(-0.2));
-    document.getElementById('btnZoomReset').addEventListener('click', () => {
-        const st = zoomStates['buildAnimSvgWrapper'];
-        if (!st) return;
-        renderBuildAnimSvg(ht, buildStep);
-        st.reset();
-        st.initBase();
-        st.apply();
-    });
+        svgWr.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            isDragging = true;
+            dragStartX = e.clientX; dragStartY = e.clientY;
+            dragTarget = {
+                type:'svg', wrapper:svgWr,
+                _sz:svgZ, _sx:svgVx, _sy:svgVy,
+                getZ:()=>svgZ, setZ:(v)=>{svgZ=v;},
+                getX:()=>svgVx, setX:(v)=>{svgVx=v;},
+                getY:()=>svgVy, setY:(v)=>{svgVy=v;},
+                getBw:()=>svgBw, getBh:()=>svgBh,
+                clamp:svgClamp, apply:svgApply
+            };
+            e.preventDefault();
+        });
+        svgWr.addEventListener('dblclick', (e) => {
+            svgZ = 1; svgVx = 0; svgVy = 0; svgApply();
+        });
+
+        // ===== 构建动画 SVG =====
+        let bldZ = 1, bldVx = 0, bldVy = 0, bldBw = 0, bldBh = 0;
+        const bldEl = document.getElementById('buildAnimSvg');
+        const bldWr = document.getElementById('buildAnimSvgWrapper');
+        const bldInd = document.getElementById('buildZoomIndicator');
+
+        function bldInit() {
+            const vb = bldEl.getAttribute('viewBox');
+            if (vb) { const p = vb.split(' ').map(Number); bldBw = p[2]; bldBh = p[3]; }
+        }
+        function bldApply() {
+            if (bldBw === 0) bldInit();
+            if (bldBw === 0) return;
+            const w = bldBw / bldZ, h = bldBh / bldZ;
+            bldEl.setAttribute('viewBox', `${bldVx} ${bldVy} ${w} ${h}`);
+            bldInd.textContent = Math.round(bldZ * 100) + '%';
+            bldInd.classList.add('visible');
+            clearTimeout(bldInd._t);
+            bldInd._t = setTimeout(() => bldInd.classList.remove('visible'), 1200);
+        }
+        function bldClamp() {
+            const w = bldBw / bldZ, h = bldBh / bldZ;
+            bldVx = Math.max(0, Math.min(bldBw - w, bldVx));
+            bldVy = Math.max(0, Math.min(bldBh - h, bldVy));
+        }
+        bldInit();
+
+        bldWr.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (bldBw === 0) bldInit();
+            const r = bldWr.getBoundingClientRect();
+            const mx = e.clientX - r.left, my = e.clientY - r.top;
+            const old = bldZ;
+            bldZ = Math.max(0.3, Math.min(5, old + (e.deltaY > 0 ? -0.15 : 0.15)));
+            const sx = bldVx + (mx / r.width) * (bldBw / old);
+            const sy = bldVy + (my / r.height) * (bldBh / old);
+            bldVx = sx - (mx / r.width) * (bldBw / bldZ);
+            bldVy = sy - (my / r.height) * (bldBh / bldZ);
+            bldClamp();
+            bldApply();
+        }, { passive: false });
+
+        bldWr.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            isDragging = true;
+            dragStartX = e.clientX; dragStartY = e.clientY;
+            dragTarget = {
+                type:'svg', wrapper:bldWr,
+                _sz:bldZ, _sx:bldVx, _sy:bldVy,
+                getZ:()=>bldZ, setZ:(v)=>{bldZ=v;},
+                getX:()=>bldVx, setX:(v)=>{bldVx=v;},
+                getY:()=>bldVy, setY:(v)=>{bldVy=v;},
+                getBw:()=>bldBw, getBh:()=>bldBh,
+                clamp:bldClamp, apply:bldApply
+            };
+            e.preventDefault();
+        });
+        bldWr.addEventListener('dblclick', (e) => {
+            bldZ = 1; bldVx = 0; bldVy = 0; bldApply();
+        });
+
+        // 构建动画工具栏按钮
+        document.getElementById('btnZoomIn').addEventListener('click', () => {
+            bldZ = Math.min(5, bldZ + 0.25);
+            bldApply();
+        });
+        document.getElementById('btnZoomOut').addEventListener('click', () => {
+            bldZ = Math.max(0.3, bldZ - 0.25);
+            bldApply();
+        });
+        document.getElementById('btnZoomReset').addEventListener('click', () => {
+            bldZ = 1; bldVx = 0; bldVy = 0;
+            bldApply();
+        });
+
+        // ===== 文本树 =====
+        let txtZ = 1, txtPx = 0, txtPy = 0;
+        const txtEl = document.getElementById('textTree');
+        const txtWr = document.getElementById('textTreeWrapper');
+        const txtInd = document.getElementById('textZoomIndicator');
+
+        function txtApply() {
+            txtEl.style.transform = `translate(${txtPx}px, ${txtPy}px) scale(${txtZ})`;
+            txtEl.style.transformOrigin = '0 0';
+            txtInd.textContent = Math.round(txtZ * 100) + '%';
+            txtInd.classList.add('visible');
+            clearTimeout(txtInd._t);
+            txtInd._t = setTimeout(() => txtInd.classList.remove('visible'), 1200);
+        }
+
+        txtWr.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const r = txtWr.getBoundingClientRect();
+            const mx = e.clientX - r.left, my = e.clientY - r.top;
+            const old = txtZ;
+            txtZ = Math.max(0.3, Math.min(5, old + (e.deltaY > 0 ? -0.15 : 0.15)));
+            txtPx = mx - (mx - txtPx) * (txtZ / old);
+            txtPy = my - (my - txtPy) * (txtZ / old);
+            txtApply();
+        }, { passive: false });
+
+        txtWr.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            isDragging = true;
+            dragStartX = e.clientX; dragStartY = e.clientY;
+            dragTarget = {
+                type:'text', wrapper:txtWr, el:txtEl,
+                _sz:txtZ, _sx:txtPx, _sy:txtPy,
+                getZ:()=>txtZ, setZ:(v)=>{txtZ=v;},
+                getX:()=>txtPx, setX:(v)=>{txtPx=v;},
+                getY:()=>txtPy, setY:(v)=>{txtPy=v;},
+                applyTxt:txtApply
+            };
+            e.preventDefault();
+        });
+        txtWr.addEventListener('dblclick', (e) => {
+            txtZ = 1; txtPx = 0; txtPy = 0; txtApply();
+        });
+
+        // ===== 全局拖拽处理 =====
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging || !dragTarget) return;
+            const t = dragTarget;
+            const rect = t.wrapper.getBoundingClientRect();
+            if (rect.width === 0) return;
+            const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
+            if (t.type === 'text') {
+                t.setX(t._sx + dx);
+                t.setY(t._sy + dy);
+                t.el.style.transform = `translate(${t.getX()}px, ${t.getY()}px) scale(${t.getZ()})`;
+                t.el.style.transformOrigin = '0 0';
+            } else {
+                const bw = t.getBw(), bh = t.getBh(), z = t.getZ();
+                const sx = (bw / z) / rect.width;
+                const sy = (bh / z) / rect.height;
+                t.setX(t._sx - dx * sx);
+                t.setY(t._sy - dy * sy);
+                t.clamp();
+                t.apply();
+            }
+        });
+        document.addEventListener('mouseup', () => { isDragging = false; dragTarget = null; });
+
+        // 暴露 reset 函数供 switchTreeView 使用
+        window._resetSvgZoom = () => { svgZ=1; svgVx=0; svgVy=0; svgInit(); svgApply(); };
+        window._resetBldZoom = () => { bldZ=1; bldVx=0; bldVy=0; bldInit(); bldApply(); };
+        window._resetTxtZoom = () => { txtZ=1; txtPx=0; txtPy=0; txtApply(); };
+
+        // 构建动画每次重渲染后更新 base 尺寸
+        const _origRenderBuild = renderBuildAnimSvg;
+        renderBuildAnimSvg = function(ht, step) {
+            _origRenderBuild(ht, step);
+            requestAnimationFrame(() => { bldInit(); bldApply(); });
+        };
+    })();
 
     /* ================================================================
        构建动画控制
@@ -935,23 +986,19 @@
             svgC.classList.add('active');
             document.getElementById('btnSvgTree').classList.add('active');
             title.textContent = '🌲 哈夫曼树结构';
-            // 重新渲染SVG并重置缩放
             renderSvgTree(ht, 'svgTree', true);
-            const st = zoomStates['svgTreeWrapper'];
-            if (st) { st.zoom = 1; st.vx = 0; st.vy = 0; st.initBase(); st.apply(); }
+            if (window._resetSvgZoom) window._resetSvgZoom();
         } else if (mode === 'text') {
             txtC.classList.add('active');
             document.getElementById('btnTextTree').classList.add('active');
             title.textContent = '📝 哈夫曼树结构 (文本)';
-            const st = zoomStates['textTreeWrapper'];
-            if (st) st.reset();
+            if (window._resetTxtZoom) window._resetTxtZoom();
         } else {
             bldC.classList.add('active');
             document.getElementById('btnBuildAnim').classList.add('active');
             title.textContent = '🎬 哈夫曼树构建过程';
             renderBuildAnimSvg(ht, buildStep);
-            const st = zoomStates['buildAnimSvgWrapper'];
-            if (st) { st.zoom = 1; st.vx = 0; st.vy = 0; st.initBase(); st.apply(); }
+            if (window._resetBldZoom) window._resetBldZoom();
         }
 
         // 清除高亮

@@ -856,6 +856,7 @@
         // ===== 全局拖拽处理 =====
         document.addEventListener('mousemove', (e) => {
             if (!isDragging || !dragTarget) return;
+            e.preventDefault();
             const t = dragTarget;
             const rect = t.wrapper.getBoundingClientRect();
             if (rect.width === 0) return;

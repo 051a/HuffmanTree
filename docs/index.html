@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>哈夫曼树应用程序 - Huffman Tree</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- ==================== 标题栏 ==================== -->
+    <header class="header">
+        <h1>🌲 哈夫曼树应用程序 <span class="en-title">(Huffman Tree)</span></h1>
+        <p class="subtitle">数据结构与算法课程设计</p>
+    </header>
+
+    <div class="container">
+        <!-- ==================== 中部双栏 ==================== -->
+        <div class="main-panels">
+            <!-- 左侧: 编码表 -->
+            <section class="panel panel-left">
+                <div class="panel-header">
+                    <h2>📊 字符及其哈夫曼编码表</h2>
+                    <span class="badge">共 27 个字符</span>
+                </div>
+                <div class="table-wrapper">
+                    <table id="codeTable">
+                        <thead>
+                            <tr>
+                                <th>字符</th>
+                                <th>权值</th>
+                                <th>哈夫曼编码</th>
+                                <th>长度</th>
+                            </tr>
+                        </thead>
+                        <tbody id="codeTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 右侧: 树结构展示 -->
+            <section class="panel panel-right">
+                <div class="panel-header">
+                    <h2>🌲 哈夫曼树结构</h2>
+                    <div class="tree-toggle">
+                        <button id="btnSvgTree" class="toggle-btn active">图形树</button>
+                        <button id="btnTextTree" class="toggle-btn">文本树</button>
+                    </div>
+                </div>
+
+                <!-- SVG 树形图 -->
+                <div id="svgTreeContainer" class="tree-view active">
+                    <div id="svgTreeWrapper">
+                        <svg id="svgTree"></svg>
+                    </div>
+                    <div class="tree-legend">
+                        <span class="legend-leaf">🟢 叶子结点 (字符)</span>
+                        <span class="legend-internal">🔵 内部结点 (权值)</span>
+                        <span class="legend-edge">━━ 0=左 / 1=右</span>
+                    </div>
+                </div>
+
+                <!-- 文本缩进树 -->
+                <div id="textTreeContainer" class="tree-view">
+                    <pre id="textTree"></pre>
+                </div>
+            </section>
+        </div>
+
+        <!-- ==================== 底部功能区 ==================== -->
+        <div class="feature-panels">
+            <!-- 功能一: 计算报文传输长度 -->
+            <section class="feature-card">
+                <div class="feature-header">
+                    <h3>📏 功能一：计算报文传输长度</h3>
+                </div>
+                <div class="feature-body">
+                    <!-- 示例按钮 -->
+                    <div class="example-section">
+                        <p class="example-label">快速示例：</p>
+                        <button id="btnExample" class="btn btn-primary">
+                            计算 "THIS PROGRAM IS MY FAVORITE"
+                        </button>
+                    </div>
+
+                    <!-- 自定义输入 -->
+                    <div class="divider"><span>或自定义输入</span></div>
+
+                    <div class="input-group">
+                        <input type="text" id="inputTransLength"
+                               placeholder="请输入要编码的文本 (仅支持空格+A~Z)"
+                               class="text-input">
+                        <button id="btnCalcLength" class="btn btn-secondary">计算</button>
+                    </div>
+
+                    <!-- 结果区域 -->
+                    <div id="transResult" class="result-box hidden">
+                        <h4>编码结果</h4>
+                        <div id="transResultContent"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 功能二: 解码01串 -->
+            <section class="feature-card">
+                <div class="feature-header">
+                    <h3>🔓 功能二：解码 01 编码串</h3>
+                </div>
+                <div class="feature-body">
+                    <div class="input-group">
+                        <input type="text" id="inputDecode"
+                               placeholder="请输入01编码串 (如: 111011010...)"
+                               class="text-input mono">
+                        <button id="btnDecode" class="btn btn-primary">解码</button>
+                    </div>
+
+                    <!-- 实时校验提示 -->
+                    <p id="decodeHint" class="hint"></p>
+
+                    <!-- 解码结果 -->
+                    <div id="decodeResult" class="result-box hidden">
+                        <h4>解码结果</h4>
+                        <div id="decodeResultContent"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ==================== 页脚 ==================== -->
+    <footer class="footer">
+        <p>哈夫曼树 — 数据结构与算法课程设计 © 2025</p>
+    </footer>
+
+    <script src="js/huffman.js"></script>
+    <script>
+    /* ============ 页面初始化 ============ */
+    document.addEventListener('DOMContentLoaded', () => {
+        // 创建哈夫曼树实例
+        const ht = new HuffmanTree();
+
+        // 渲染编码表
+        renderCodeTable(ht);
+
+        // 渲染树 (默认SVG)
+        renderSvgTree(ht);
+        renderTextTree(ht);
+
+        // 树展示切换
+        document.getElementById('btnSvgTree').addEventListener('click', () => switchTreeView('svg'));
+        document.getElementById('btnTextTree').addEventListener('click', () => switchTreeView('text'));
+
+        // 功能一: 报文传输长度
+        document.getElementById('btnExample').addEventListener('click', () => {
+            document.getElementById('inputTransLength').value = 'THIS PROGRAM IS MY FAVORITE';
+            calcAndShowLength(ht, 'THIS PROGRAM IS MY FAVORITE');
+        });
+        document.getElementById('btnCalcLength').addEventListener('click', () => {
+            const input = document.getElementById('inputTransLength').value;
+            if (input.trim() === '') {
+                alert('请输入文本内容!');
+                return;
+            }
+            calcAndShowLength(ht, input);
+        });
+        // 回车触发计算
+        document.getElementById('inputTransLength').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('btnCalcLength').click();
+            }
+        });
+
+        // 功能二: 解码
+        document.getElementById('btnDecode').addEventListener('click', () => {
+            decodeAndShow(ht);
+        });
+        document.getElementById('inputDecode').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('btnDecode').click();
+            }
+        });
+        // 解码输入实时校验
+        document.getElementById('inputDecode').addEventListener('input', (e) => {
+            validateDecodeInput(e.target.value);
+        });
+    });
+
+    /* ============ 渲染编码表 ============ */
+    function renderCodeTable(ht) {
+        const tbody = document.getElementById('codeTableBody');
+        const table = ht.getCodeTable();
+        table.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="col-char">${row.displayCh}</td>
+                <td class="col-weight">${row.weight}</td>
+                <td class="col-bits">${row.bits}</td>
+                <td class="col-len">${row.len}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    /* ============ 渲染文本缩进树 ============ */
+    function renderTextTree(ht) {
+        const lines = ht.getTreeText();
+        document.getElementById('textTree').textContent = lines.join('\n');
+    }
+
+    /* ============ 渲染SVG树形图 ============ */
+    function renderSvgTree(ht) {
+        const layout = ht.getTreeLayout();
+        const { positions, edges, nodeCount, totalDepth } = layout;
+
+        // SVG参数
+        const nodeRadius = 22;
+        const hGap = 70;    // 节点水平间距
+        const vGap = 75;    // 垂直层间距
+        const padding = 60;
+
+        const svgWidth = Math.max(nodeCount * hGap + padding * 2, 600);
+        const svgHeight = totalDepth * vGap + padding * 2 + 30;
+
+        const svg = document.getElementById('svgTree');
+        svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', svgHeight);
+        svg.innerHTML = '';
+
+        // 定义箭头标记 (但哈夫曼树不需要箭头，用颜色区分)
+        // 定义渐变和阴影
+        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        defs.innerHTML = `
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.2"/>
+            </filter>
+            <linearGradient id="gradLeaf" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#4ade80"/>
+                <stop offset="100%" style="stop-color:#22c55e"/>
+            </linearGradient>
+            <linearGradient id="gradInternal" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#60a5fa"/>
+                <stop offset="100%" style="stop-color:#3b82f6"/>
+            </linearGradient>
+        `;
+        svg.appendChild(defs);
+
+        // 绘制连线
+        edges.forEach(edge => {
+            const from = positions[edge.from];
+            const to = positions[edge.to];
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+
+            // 使用padding偏移
+            const x1 = padding + from.x * hGap;
+            const y1 = padding + from.y * vGap;
+            const x2 = padding + to.x * hGap;
+            const y2 = padding + to.y * vGap;
+
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('stroke', edge.side === '0' ? '#f59e0b' : '#8b5cf6');
+            line.setAttribute('stroke-width', '2');
+            line.setAttribute('stroke-opacity', '0.7');
+            svg.appendChild(line);
+
+            // 边上的标签 (0 或 1)
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            const mx = (x1 + x2) / 2;
+            const my = (y1 + y2) / 2 - 6;
+            text.setAttribute('x', mx);
+            text.setAttribute('y', my);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('font-size', '13');
+            text.setAttribute('font-weight', 'bold');
+            text.setAttribute('fill', edge.side === '0' ? '#d97706' : '#7c3aed');
+            text.textContent = edge.side;
+            svg.appendChild(text);
+        });
+
+        // 绘制节点
+        for (let i = 0; i < ht.m; i++) {
+            const pos = positions[i];
+            if (!pos) continue;
+
+            const cx = padding + pos.x * hGap;
+            const cy = padding + pos.y * vGap;
+
+            const isLeaf = i < ht.n;
+            const node = ht.nodes[i];
+
+            // 圆形节点
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', cx);
+            circle.setAttribute('cy', cy);
+            circle.setAttribute('r', isLeaf ? 20 : 22);
+            circle.setAttribute('fill', isLeaf ? 'url(#gradLeaf)' : 'url(#gradInternal)');
+            circle.setAttribute('stroke', isLeaf ? '#16a34a' : '#2563eb');
+            circle.setAttribute('stroke-width', '2');
+            circle.setAttribute('filter', 'url(#shadow)');
+            svg.appendChild(circle);
+
+            // 节点文字
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', cx);
+            text.setAttribute('y', cy + 1);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('dominant-baseline', 'central');
+            text.setAttribute('font-size', '11');
+            text.setAttribute('font-weight', 'bold');
+            text.setAttribute('fill', '#fff');
+
+            if (isLeaf) {
+                const ch = node.ch === ' ' ? '␣' : node.ch;
+                text.textContent = `${ch}`;
+            } else {
+                text.textContent = `${node.weight}`;
+            }
+            svg.appendChild(text);
+
+            // 叶子节点下方显示权值
+            if (isLeaf) {
+                const wText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                wText.setAttribute('x', cx);
+                wText.setAttribute('y', cy + nodeRadius + 14);
+                wText.setAttribute('text-anchor', 'middle');
+                wText.setAttribute('font-size', '10');
+                wText.setAttribute('fill', '#64748b');
+                wText.textContent = `${node.weight}`;
+                svg.appendChild(wText);
+            }
+        }
+    }
+
+    /* ============ 切换树展示方式 ============ */
+    function switchTreeView(mode) {
+        const svgContainer = document.getElementById('svgTreeContainer');
+        const textContainer = document.getElementById('textTreeContainer');
+        const btnSvg = document.getElementById('btnSvgTree');
+        const btnText = document.getElementById('btnTextTree');
+
+        if (mode === 'svg') {
+            svgContainer.classList.add('active');
+            textContainer.classList.remove('active');
+            btnSvg.classList.add('active');
+            btnText.classList.remove('active');
+        } else {
+            svgContainer.classList.remove('active');
+            textContainer.classList.add('active');
+            btnSvg.classList.remove('active');
+            btnText.classList.add('active');
+        }
+    }
+
+    /* ============ 计算并显示报文传输长度 ============ */
+    function calcAndShowLength(ht, str) {
+        const { details, totalBits } = ht.calcTransLength(str);
+        const resultBox = document.getElementById('transResult');
+        const content = document.getElementById('transResultContent');
+
+        let html = `<p class="result-original"><strong>原文:</strong> ${escapeHtml(str)}</p>`;
+        html += '<table class="detail-table">';
+        html += '<thead><tr><th>字符</th><th>编码</th><th>位数</th></tr></thead><tbody>';
+
+        details.forEach(d => {
+            if (d.valid) {
+                html += `<tr>
+                    <td>${d.displayCh}</td>
+                    <td class="col-bits">${d.bits}</td>
+                    <td>${d.len}</td>
+                </tr>`;
+            } else {
+                html += `<tr class="row-invalid">
+                    <td>${d.displayCh}</td>
+                    <td class="col-bits">${d.bits}</td>
+                    <td>-</td>
+                </tr>`;
+            }
+        });
+
+        html += '</tbody></table>';
+        html += `<p class="result-total">📊 总报文传输长度: <strong>${totalBits} bits</strong></p>`;
+        html += `<p class="result-byte">≈ <strong>${Math.ceil(totalBits / 8)}</strong> 字节 (${totalBits} ÷ 8)</p>`;
+
+        content.innerHTML = html;
+        resultBox.classList.remove('hidden');
+    }
+
+    /* ============ 解码并显示结果 ============ */
+    function decodeAndShow(ht) {
+        const input = document.getElementById('inputDecode').value.trim();
+        const resultBox = document.getElementById('decodeResult');
+        const content = document.getElementById('decodeResultContent');
+
+        if (input === '') {
+            content.innerHTML = '<p class="error-text">请输入01编码串!</p>';
+            resultBox.classList.remove('hidden');
+            return;
+        }
+
+        const { success, error, result } = ht.decode(input);
+
+        if (success) {
+            // 美化显示: 空格用 ␣ 表示
+            const displayResult = result.replace(/ /g, '<span class="space-mark">␣</span>');
+            content.innerHTML = `
+                <p class="decode-success">✅ 解码成功</p>
+                <p class="decode-input"><strong>输入:</strong> ${escapeHtml(input)}</p>
+                <p class="decode-output"><strong>结果:</strong> <span class="decode-result-text">${displayResult}</span></p>
+                <p class="decode-length">共解码出 <strong>${result.length}</strong> 个字符</p>
+            `;
+        } else {
+            content.innerHTML = `<p class="error-text">❌ ${escapeHtml(error)}</p>`;
+        }
+
+        resultBox.classList.remove('hidden');
+    }
+
+    /* ============ 实时校验解码输入 ============ */
+    function validateDecodeInput(value) {
+        const hint = document.getElementById('decodeHint');
+        if (value === '') {
+            hint.textContent = '';
+            hint.className = 'hint';
+            return;
+        }
+
+        const valid = /^[01\s]*$/.test(value);
+        if (!valid) {
+            hint.textContent = '⚠ 输入包含非0/1字符，请检查!';
+            hint.className = 'hint hint-error';
+        } else {
+            hint.textContent = `✅ 有效编码串，共 ${value.replace(/\s/g, '').length} 位`;
+            hint.className = 'hint hint-ok';
+        }
+    }
+
+    /* ============ HTML转义 ============ */
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+    </script>
+</body>
+</html>

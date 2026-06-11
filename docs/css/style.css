@@ -1,0 +1,605 @@
+/* ============================================================
+   哈夫曼树应用程序 - 样式表
+   数据结构与算法课程设计
+   ============================================================ */
+
+/* ============ CSS 变量 ============ */
+:root {
+    --primary:       #2563eb;
+    --primary-dark:  #1d4ed8;
+    --primary-light: #dbeafe;
+    --success:       #16a34a;
+    --success-light: #dcfce7;
+    --warning:       #d97706;
+    --warning-light: #fef3c7;
+    --danger:        #dc2626;
+    --danger-light:  #fee2e2;
+    --purple:        #7c3aed;
+    --purple-light:  #ede9fe;
+
+    --bg:            #f8fafc;
+    --bg-card:       #ffffff;
+    --bg-header:     linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+
+    --text-primary:  #1e293b;
+    --text-secondary:#475569;
+    --text-muted:    #94a3b8;
+    --text-on-header:#ffffff;
+
+    --border:        #e2e8f0;
+    --border-light:  #f1f5f9;
+
+    --radius:        12px;
+    --radius-sm:     8px;
+    --shadow:        0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md:     0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+    --shadow-lg:     0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+
+    --font-mono:     'Consolas', 'Courier New', 'Source Code Pro', monospace;
+    --font-sans:     'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* ============ 全局基础 ============ */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* ============ 头部 ============ */
+.header {
+    background: var(--bg-header);
+    color: var(--text-on-header);
+    text-align: center;
+    padding: 32px 20px 28px;
+    box-shadow: var(--shadow-md);
+}
+
+.header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.header .en-title {
+    font-weight: 400;
+    font-size: 1.1rem;
+    opacity: 0.85;
+}
+
+.header .subtitle {
+    margin-top: 6px;
+    font-size: 0.95rem;
+    opacity: 0.75;
+}
+
+/* ============ 主容器 ============ */
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 20px 40px;
+}
+
+/* ============ 双栏布局 ============ */
+.main-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 28px;
+}
+
+@media (max-width: 1100px) {
+    .main-panels {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============ 面板通用 ============ */
+.panel {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--border-light);
+}
+
+.panel-header h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* ============ 编码表格 ============ */
+.table-wrapper {
+    max-height: 520px;
+    overflow-y: auto;
+    padding: 0;
+}
+
+#codeTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+#codeTable thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+#codeTable thead th {
+    background: #f1f5f9;
+    color: var(--text-secondary);
+    font-weight: 600;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid var(--border);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#codeTable tbody td {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+#codeTable tbody tr {
+    transition: background 0.15s;
+}
+
+#codeTable tbody tr:nth-child(even) {
+    background: #fafbfc;
+}
+
+#codeTable tbody tr:hover {
+    background: var(--primary-light);
+}
+
+.col-char {
+    font-weight: 700;
+    color: var(--primary);
+    width: 60px;
+}
+
+.col-weight {
+    color: var(--text-secondary);
+    width: 60px;
+}
+
+.col-bits {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--purple);
+    letter-spacing: 0.5px;
+}
+
+.col-len {
+    font-weight: 600;
+    color: var(--text-secondary);
+    width: 50px;
+    text-align: center;
+}
+
+/* ============ 徽章 ============ */
+.badge {
+    background: var(--primary-light);
+    color: var(--primary);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* ============ 树展示切换按钮 ============ */
+.tree-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+}
+
+.toggle-btn {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    transition: all 0.2s;
+}
+
+.toggle-btn.active {
+    background: var(--bg-card);
+    color: var(--primary);
+    box-shadow: var(--shadow);
+    font-weight: 600;
+}
+
+.toggle-btn:hover:not(.active) {
+    color: var(--text-primary);
+}
+
+/* ============ 树视图容器 ============ */
+.tree-view {
+    display: none;
+    padding: 16px;
+    overflow: auto;
+}
+
+.tree-view.active {
+    display: block;
+}
+
+/* ============ SVG 树形图 ============ */
+#svgTreeWrapper {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 460px;
+    text-align: center;
+}
+
+#svgTree {
+    display: block;
+    margin: 0 auto;
+}
+
+.tree-legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 12px 16px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-light);
+    margin-top: 8px;
+}
+
+/* ============ 文本缩进树 ============ */
+#textTree {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: var(--text-primary);
+    white-space: pre;
+    padding: 12px 16px;
+    max-height: 460px;
+    overflow: auto;
+    background: #fafbfc;
+    border-radius: var(--radius-sm);
+}
+
+/* ============ 功能区 ============ */
+.feature-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+@media (max-width: 1100px) {
+    .feature-panels {
+        grid-template-columns: 1fr;
+    }
+}
+
+.feature-card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.feature-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--border-light);
+}
+
+.feature-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.feature-body {
+    padding: 20px;
+}
+
+/* ============ 示例按钮区域 ============ */
+.example-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.example-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* ============ 分割线 ============ */
+.divider {
+    display: flex;
+    align-items: center;
+    margin: 18px 0;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.divider span {
+    padding: 0 16px;
+}
+
+/* ============ 输入组 ============ */
+.input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.text-input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    background: var(--bg-card);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+}
+
+.text-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.text-input.mono {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+}
+
+/* ============ 按钮 ============ */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.btn:active {
+    transform: scale(0.97);
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.btn-secondary:hover {
+    background: #bfdbfe;
+}
+
+/* ============ 提示文本 ============ */
+.hint {
+    margin-top: 8px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    min-height: 20px;
+}
+
+.hint-error {
+    color: var(--danger);
+    font-weight: 500;
+}
+
+.hint-ok {
+    color: var(--success);
+}
+
+/* ============ 结果盒子 ============ */
+.result-box {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--border-light);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+.result-box.hidden {
+    display: none;
+}
+
+.result-box h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.result-original {
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+/* ============ 结果详情表 ============ */
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+}
+
+.detail-table th {
+    background: #e2e8f0;
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.78rem;
+}
+
+.detail-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-light);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+}
+
+.detail-table td:first-child {
+    width: 60px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.detail-table td:nth-child(2) {
+    color: var(--purple);
+    letter-spacing: 0.5px;
+}
+
+.row-invalid td {
+    color: var(--text-muted) !important;
+    text-decoration: line-through;
+}
+
+.result-total {
+    font-size: 1rem;
+    color: var(--primary);
+    margin-top: 8px;
+}
+
+.result-total strong {
+    font-size: 1.15rem;
+}
+
+.result-byte {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* ============ 解码结果 ============ */
+.decode-success {
+    color: var(--success);
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 8px;
+}
+
+.decode-input,
+.decode-output {
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    word-break: break-all;
+}
+
+.decode-input {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.5px;
+}
+
+.decode-result-text {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.space-mark {
+    display: inline-block;
+    background: var(--primary-light);
+    color: var(--primary);
+    padding: 0 4px;
+    border-radius: 3px;
+    font-weight: 600;
+}
+
+.decode-length {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
+.error-text {
+    color: var(--danger);
+    font-weight: 500;
+}
+
+/* ============ 页脚 ============ */
+.footer {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+}
+
+/* ============ 滚动条美化 ============ */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}

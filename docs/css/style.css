@@ -324,6 +324,7 @@ body {
     cursor: grab;
     position: relative;
     height: 420px;
+    background: #1e1e2e;
 }
 
 .zoomable-wrapper:active {

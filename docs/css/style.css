@@ -716,15 +716,86 @@ body {
 }
 
 #buildAnimSvgWrapper {
-    overflow-x: auto;
-    overflow-y: auto;
-    max-height: 400px;
+    overflow: hidden;
+    max-height: 420px;
     text-align: center;
+    position: relative;
+    cursor: default;
 }
 
 #buildAnimSvg {
     display: block;
     margin: 0 auto;
+}
+
+/* 缩放容器 */
+#buildAnimSvgInner {
+    transform-origin: 0 0;
+    transition: none;  /* 缩放时不用过渡，保持即时响应 */
+    display: inline-block;
+}
+
+/* 缩放工具栏 */
+.zoom-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: #fafbfc;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.btn-icon-zoom {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    color: var(--text-secondary);
+}
+
+.btn-icon-zoom:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.btn-icon-zoom:active {
+    transform: scale(0.95);
+}
+
+.zoom-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 44px;
+    text-align: center;
+    font-family: var(--font-mono);
+}
+
+.btn-zoom-reset {
+    font-size: 0.9rem;
+    margin-left: 4px;
+}
+
+.zoom-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+    .zoom-hint {
+        display: none;
+    }
 }
 
 /* ================================================================

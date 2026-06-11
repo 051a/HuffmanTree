@@ -53,18 +53,22 @@
                 <div id="svgTreeContainer" class="tree-view active">
                     <div id="svgTreeWrapper">
                         <svg id="svgTree"></svg>
+                        <div class="zoom-indicator" id="svgZoomIndicator">100%</div>
                     </div>
                     <div class="tree-legend">
                         <span class="legend-leaf">🟢 叶子结点</span>
                         <span class="legend-internal">🔵 内部结点</span>
                         <span class="legend-edge">0=左 / 1=右</span>
-                        <span class="legend-click">💡 点击叶子可联动高亮编码表</span>
+                        <span class="legend-click">💡 点击联动 · Ctrl+滚轮缩放 · 拖拽平移</span>
                     </div>
                 </div>
 
                 <!-- 文本缩进树 -->
                 <div id="textTreeContainer" class="tree-view">
-                    <pre id="textTree"></pre>
+                    <div id="textTreeWrapper" class="zoomable-wrapper">
+                        <pre id="textTree" class="tree-view-content"></pre>
+                        <div class="zoom-indicator" id="textZoomIndicator">100%</div>
+                    </div>
                 </div>
 
                 <!-- 构建动画 -->
@@ -75,11 +79,12 @@
                         <span id="zoomLevelLabel" class="zoom-label">100%</span>
                         <button id="btnZoomIn" class="btn-icon-zoom" title="放大">🔍+</button>
                         <button id="btnZoomReset" class="btn-icon-zoom btn-zoom-reset" title="重置缩放">↺</button>
-                        <span class="zoom-hint">滚轮缩放 · 拖拽平移 · 双击重置</span>
+                        <span class="zoom-hint">Ctrl+滚轮缩放 · 拖拽平移 · 双击重置</span>
                     </div>
                     <!-- SVG 缩放容器 (viewBox 操控) -->
                     <div id="buildAnimSvgWrapper">
                         <svg id="buildAnimSvg"></svg>
+                        <div class="zoom-indicator" id="buildZoomIndicator">100%</div>
                     </div>
                     <div class="build-controls">
                         <div class="build-step-indicator" id="buildStepLabel">初始状态 (27个叶子)</div>
@@ -194,13 +199,10 @@
     let buildTimer = null;
     const BUILD_TOTAL = 26;
 
-    // 缩放/拖拽状态 (viewBox 方式)
-    let buildZoom = 1;
-    let viewX = 0, viewY = 0;
-    let baseW = 0, baseH = 0;    // SVG 完整 viewBox 尺寸
+    // 统一拖拽状态
     let isDragging = false;
     let dragStartX = 0, dragStartY = 0;
-    let dragViewStartX = 0, dragViewStartY = 0;
+    let dragTarget = null;  // 当前拖拽的目标配置
 
     // 解码动画状态
     let decodeAnimating = false;
@@ -224,14 +226,11 @@
         renderSvgTree(ht, 'svgTree', true);
         renderTextTree(ht);
         renderBuildAnimSvg(ht, 0);  // 初始状态
-        // 记录 SVG 完整 viewBox 尺寸
-        const initVB = document.getElementById('buildAnimSvg').getAttribute('viewBox');
-        if (initVB) {
-            const parts = initVB.split(' ').map(Number);
-            baseW = parts[2];
-            baseH = parts[3];
-        }
         bindEvents();
+        // 绑定三个视图的缩放拖拽
+        bindSvgZoomPan('svgTreeWrapper', 'svgTree', 'svgZoomIndicator');
+        bindSvgZoomPan('buildAnimSvgWrapper', 'buildAnimSvg', 'buildZoomIndicator');
+        bindTextZoomPan('textTreeWrapper', 'textTree', 'textZoomIndicator');
     });
 
     function bindEvents() {
@@ -272,9 +271,6 @@
         document.getElementById('btnDecodeAnim').addEventListener('click', () => setDecodeMode('anim'));
         document.getElementById('decodeSpeedSlider').addEventListener('input', () => {});
         document.getElementById('btnDecodeStop').addEventListener('click', stopDecodeAnim);
-
-        // 构建动画 - 缩放/拖拽
-        bindBuildZoomPan();
     }
 
     /* ================================================================
@@ -316,7 +312,49 @@
        文本树
        ================================================================ */
     function renderTextTree(ht) {
-        document.getElementById('textTree').textContent = ht.getTreeText().join('\n');
+        const lines = ht.getTreeText();
+        const rootIdx = ht.m - 1;
+        let html = '';
+        lines.forEach(line => {
+            // 解析每行：缩进 + 结点信息
+            const match = line.match(/^(\s*)(\((\d+)\)\s*)(.*)$/);
+            if (match) {
+                const indent = match[1];
+                const idxPart = match[2];
+                const idx = parseInt(match[3]);
+                const rest = match[4];
+
+                // 缩进字符
+                html += `<span class="tree-indent">${escapeHtml(indent)}</span>`;
+                // 下标
+                html += `<span class="tree-idx">(${idx})</span> `;
+
+                // 结点内容
+                if (idx < ht.n) {
+                    // 叶子结点：字符:权值 [编码]
+                    const rm = rest.match(/(.+?:(\d+))\s*(\[.*?\])?/);
+                    if (rm) {
+                        html += `<span class="tree-leaf">${escapeHtml(rm[1])}</span>`;
+                        if (rm[3]) html += ` <span class="tree-code-bit">${escapeHtml(rm[3])}</span>`;
+                    } else {
+                        html += `<span class="tree-leaf">${escapeHtml(rest)}</span>`;
+                    }
+                } else if (idx === rootIdx) {
+                    // 根节点
+                    html += `<span class="tree-root-node">${escapeHtml(rest)}</span>`;
+                } else {
+                    // 内部结点
+                    html += `<span class="tree-internal">${escapeHtml(rest)}</span>`;
+                }
+            } else {
+                html += escapeHtml(line);
+            }
+            html += '\n';
+        });
+        document.getElementById('textTree').innerHTML = html;
+        // 重置文本树缩放
+        const st = zoomStates['textTreeWrapper'];
+        if (st) st.reset();
     }
 
     /* ================================================================
@@ -636,129 +674,189 @@
     }
 
     /* ================================================================
-       构建动画 SVG 缩放/拖拽 (viewBox 操控)
+       统一缩放/拖拽系统 (Ctrl+滚轮缩放, 拖拽平移)
        ================================================================ */
-    function bindBuildZoomPan() {
-        const wrapper = document.getElementById('buildAnimSvgWrapper');
 
-        // 鼠标滚轮缩放（以光标为中心）
+    // 每个可缩放区域的独立状态
+    const zoomStates = {};  // wrapperId → { zoom, vx, vy, bw, bh, svg?, content?, indicator?, type }
+
+    // SVG 视图缩放 (viewBox 操控)
+    function bindSvgZoomPan(wrapperId, svgId, indicatorId) {
+        const wrapper = document.getElementById(wrapperId);
+        const svg = document.getElementById(svgId);
+        const st = { zoom: 1, vx: 0, vy: 0, bw: 0, bh: 0, svg, wrapper,
+                     indicator: document.getElementById(indicatorId), type: 'svg' };
+        zoomStates[wrapperId] = st;
+
+        function initBase() {
+            const vb = svg.getAttribute('viewBox');
+            if (vb) { const p = vb.split(' ').map(Number); st.bw = p[2]; st.bh = p[3]; }
+        }
+        st.initBase = initBase;
+        st.apply = () => {
+            if (st.bw === 0) st.initBase();
+            if (st.bw === 0) return;
+            svg.setAttribute('viewBox', `${st.vx} ${st.vy} ${st.bw/st.zoom} ${st.bh/st.zoom}`);
+            showZoomIndicator(st);
+        };
+        st.clamp = () => {
+            const w = st.bw / st.zoom, h = st.bh / st.zoom;
+            st.vx = Math.max(0, Math.min(st.bw - w, st.vx));
+            st.vy = Math.max(0, Math.min(st.bh - h, st.vy));
+        };
+        st.reset = () => { st.zoom = 1; st.vx = 0; st.vy = 0; st.apply(); };
+        initBase();
+
+        // Ctrl+滚轮缩放
         wrapper.addEventListener('wheel', (e) => {
+            if (!e.ctrlKey) return;
             e.preventDefault();
             const rect = wrapper.getBoundingClientRect();
-            const mx = e.clientX - rect.left;
-            const my = e.clientY - rect.top;
-            const delta = e.deltaY > 0 ? -0.15 : 0.15;
-            zoomAtPoint(mx, my, delta);
+            if (rect.width === 0) return;
+            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            const old = st.zoom;
+            st.zoom = Math.max(0.3, Math.min(5, st.zoom + (e.deltaY > 0 ? -0.15 : 0.15)));
+            const sx = st.vx + (mx / rect.width) * (st.bw / old);
+            const sy = st.vy + (my / rect.height) * (st.bh / old);
+            st.vx = sx - (mx / rect.width) * (st.bw / st.zoom);
+            st.vy = sy - (my / rect.height) * (st.bh / st.zoom);
+            st.clamp();
+            st.apply();
         }, { passive: false });
 
-        // 拖拽平移
+        // 拖拽
         wrapper.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
             isDragging = true;
             dragStartX = e.clientX;
             dragStartY = e.clientY;
-            dragViewStartX = viewX;
-            dragViewStartY = viewY;
+            dragTarget = st;
+            dragTarget._startZoom = st.zoom;
+            dragTarget._startVx = st.vx;
+            dragTarget._startVy = st.vy;
             e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            const wrapper = document.getElementById('buildAnimSvgWrapper');
-            const rect = wrapper.getBoundingClientRect();
-            // 屏幕像素 → SVG 坐标系的转换比例
-            const scaleX = (baseW / buildZoom) / rect.width;
-            const scaleY = (baseH / buildZoom) / rect.height;
-            viewX = dragViewStartX - (e.clientX - dragStartX) * scaleX;
-            viewY = dragViewStartY - (e.clientY - dragStartY) * scaleY;
-            applyViewBox();
-        });
-
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
         });
 
         // 双击重置
-        wrapper.addEventListener('dblclick', (e) => {
+        wrapper.addEventListener('dblclick', (e) => { e.preventDefault(); st.reset(); });
+    }
+
+    // 文本视图缩放 (CSS transform)
+    function bindTextZoomPan(wrapperId, contentId, indicatorId) {
+        const wrapper = document.getElementById(wrapperId);
+        const content = document.getElementById(contentId);
+        const st = { zoom: 1, vx: 0, vy: 0, content, wrapper,
+                     indicator: document.getElementById(indicatorId), type: 'text' };
+        zoomStates[wrapperId] = st;
+
+        st.apply = () => {
+            content.style.transform = `translate(${st.vx}px, ${st.vy}px) scale(${st.zoom})`;
+            content.style.transformOrigin = '0 0';
+            showZoomIndicator(st);
+        };
+        st.reset = () => { st.zoom = 1; st.vx = 0; st.vy = 0; st.apply(); };
+
+        wrapper.addEventListener('wheel', (e) => {
+            if (!e.ctrlKey) return;
             e.preventDefault();
-            resetBuildZoom();
-        });
-
-        // 工具栏按钮
-        document.getElementById('btnZoomIn').addEventListener('click', () => {
             const rect = wrapper.getBoundingClientRect();
-            zoomAtPoint(rect.width / 2, rect.height / 2, 0.2);
+            if (rect.width === 0) return;
+            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            const old = st.zoom;
+            st.zoom = Math.max(0.3, Math.min(5, st.zoom + (e.deltaY > 0 ? -0.15 : 0.15)));
+            st.vx = mx - (mx - st.vx) * (st.zoom / old);
+            st.vy = my - (my - st.vy) * (st.zoom / old);
+            st.apply();
+        }, { passive: false });
+
+        wrapper.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            dragTarget = st;
+            dragTarget._startZoom = st.zoom;
+            dragTarget._startVx = st.vx;
+            dragTarget._startVy = st.vy;
+            e.preventDefault();
         });
-        document.getElementById('btnZoomOut').addEventListener('click', () => {
-            const rect = wrapper.getBoundingClientRect();
-            zoomAtPoint(rect.width / 2, rect.height / 2, -0.2);
-        });
-        document.getElementById('btnZoomReset').addEventListener('click', resetBuildZoom);
+
+        wrapper.addEventListener('dblclick', (e) => { e.preventDefault(); st.reset(); });
     }
 
-    function zoomAtPoint(mx, my, delta) {
-        const oldZoom = buildZoom;
-        const newZoom = Math.max(0.3, Math.min(5, buildZoom + delta));
-        if (newZoom === oldZoom) return;
-
-        // 将屏幕坐标 (mx, my) 映射到当前 SVG 坐标
-        const svgX = viewX + (mx / document.getElementById('buildAnimSvgWrapper').getBoundingClientRect().width) * (baseW / oldZoom);
-        const svgY = viewY + (my / document.getElementById('buildAnimSvgWrapper').getBoundingClientRect().height) * (baseH / oldZoom);
-
-        buildZoom = newZoom;
-        // 调整 viewBox 原点，使 svgX,svgY 仍对准 mx,my
-        const rect = document.getElementById('buildAnimSvgWrapper').getBoundingClientRect();
-        viewX = svgX - (mx / rect.width) * (baseW / newZoom);
-        viewY = svgY - (my / rect.height) * (baseH / newZoom);
-        clampViewBox();
-        applyViewBox();
-        updateZoomUI();
+    function showZoomIndicator(st) {
+        const ind = st.indicator;
+        if (!ind) return;
+        ind.textContent = Math.round(st.zoom * 100) + '%';
+        ind.classList.add('visible');
+        clearTimeout(ind._timer);
+        ind._timer = setTimeout(() => ind.classList.remove('visible'), 1500);
     }
 
-    function applyViewBox() {
-        const svg = document.getElementById('buildAnimSvg');
-        if (!svg || baseW === 0) return;
-        const w = baseW / buildZoom;
-        const h = baseH / buildZoom;
-        svg.setAttribute('viewBox', `${viewX} ${viewY} ${w} ${h}`);
-    }
+    // 全局拖拽处理
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging || !dragTarget) return;
+        const st = dragTarget;
+        const rect = st.wrapper.getBoundingClientRect();
+        if (rect.width === 0) return;
+        const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
 
-    function clampViewBox() {
-        const w = baseW / buildZoom;
-        const h = baseH / buildZoom;
-        viewX = Math.max(0, Math.min(baseW - w, viewX));
-        viewY = Math.max(0, Math.min(baseH - h, viewY));
-    }
-
-    function resetBuildZoom() {
-        buildZoom = 1;
-        viewX = 0;
-        viewY = 0;
-        applyViewBox();
-        updateZoomUI();
-    }
-
-    function updateZoomUI() {
-        document.getElementById('zoomLevelLabel').textContent = Math.round(buildZoom * 100) + '%';
-    }
-
-    // 每次重新渲染构建SVG后保持缩放状态
-    const origRenderBuild = renderBuildAnimSvg;
-    renderBuildAnimSvg = function(ht, step) {
-        origRenderBuild(ht, step);
-        // 更新 baseW/baseH
-        const svg = document.getElementById('buildAnimSvg');
-        const vb = svg.getAttribute('viewBox');
-        if (vb) {
-            const parts = vb.split(' ').map(Number);
-            baseW = parts[2];
-            baseH = parts[3];
+        if (st.type === 'text') {
+            st.vx = st._startVx + dx;
+            st.vy = st._startVy + dy;
+        } else {
+            const sx = (st.bw / st.zoom) / rect.width;
+            const sy = (st.bh / st.zoom) / rect.height;
+            st.vx = st._startVx - dx * sx;
+            st.vy = st._startVy - dy * sy;
+            if (st.clamp) st.clamp();
         }
-        // 如果已缩放，重新应用
-        if (buildZoom !== 1 || viewX !== 0 || viewY !== 0) {
-            requestAnimationFrame(() => applyViewBox());
+        if (st.apply) st.apply();
+    });
+
+    document.addEventListener('mouseup', () => { isDragging = false; dragTarget = null; });
+
+    // 工具栏缩放按钮
+    document.getElementById('btnZoomIn').addEventListener('click', () => {
+        const st = zoomStates['buildAnimSvgWrapper'];
+        if (!st) return;
+        const rect = st.wrapper.getBoundingClientRect();
+        const mx = rect.width / 2, my = rect.height / 2;
+        const old = st.zoom;
+        st.zoom = Math.min(5, st.zoom + 0.2);
+        if (st.type === 'svg') {
+            const sx = st.vx + (mx / rect.width) * (st.bw / old);
+            const sy = st.vy + (my / rect.height) * (st.bh / old);
+            st.vx = sx - (mx / rect.width) * (st.bw / st.zoom);
+            st.vy = sy - (my / rect.height) * (st.bh / st.zoom);
+            st.clamp();
         }
-    };
+        st.apply();
+    });
+    document.getElementById('btnZoomOut').addEventListener('click', () => {
+        const st = zoomStates['buildAnimSvgWrapper'];
+        if (!st) return;
+        const rect = st.wrapper.getBoundingClientRect();
+        const mx = rect.width / 2, my = rect.height / 2;
+        const old = st.zoom;
+        st.zoom = Math.max(0.3, st.zoom - 0.2);
+        if (st.type === 'svg') {
+            const sx = st.vx + (mx / rect.width) * (st.bw / old);
+            const sy = st.vy + (my / rect.height) * (st.bh / old);
+            st.vx = sx - (mx / rect.width) * (st.bw / st.zoom);
+            st.vy = sy - (my / rect.height) * (st.bh / st.zoom);
+            st.clamp();
+        }
+        st.apply();
+    });
+    document.getElementById('btnZoomReset').addEventListener('click', () => {
+        const st = zoomStates['buildAnimSvgWrapper'];
+        if (!st) return;
+        // 重渲染当前步骤
+        renderBuildAnimSvg(ht, buildStep);
+        st.zoom = 1; st.vx = 0; st.vy = 0; st.initBase();
+        st.apply();
+    });
 
     /* ================================================================
        构建动画控制
@@ -853,17 +951,23 @@
             svgC.classList.add('active');
             document.getElementById('btnSvgTree').classList.add('active');
             title.textContent = '🌲 哈夫曼树结构';
-            // 重新渲染SVG以保持点击事件
+            // 重新渲染SVG并重置缩放
             renderSvgTree(ht, 'svgTree', true);
+            const st = zoomStates['svgTreeWrapper'];
+            if (st) { st.zoom = 1; st.vx = 0; st.vy = 0; st.initBase(); st.apply(); }
         } else if (mode === 'text') {
             txtC.classList.add('active');
             document.getElementById('btnTextTree').classList.add('active');
             title.textContent = '📝 哈夫曼树结构 (文本)';
+            const st = zoomStates['textTreeWrapper'];
+            if (st) st.reset();
         } else {
             bldC.classList.add('active');
             document.getElementById('btnBuildAnim').classList.add('active');
             title.textContent = '🎬 哈夫曼树构建过程';
             renderBuildAnimSvg(ht, buildStep);
+            const st = zoomStates['buildAnimSvgWrapper'];
+            if (st) { st.zoom = 1; st.vx = 0; st.vy = 0; st.initBase(); st.apply(); }
         }
 
         // 清除高亮

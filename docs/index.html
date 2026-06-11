@@ -77,11 +77,9 @@
                         <button id="btnZoomReset" class="btn-icon-zoom btn-zoom-reset" title="重置缩放">↺</button>
                         <span class="zoom-hint">滚轮缩放 · 拖拽平移 · 双击重置</span>
                     </div>
-                    <!-- SVG 缩放容器 -->
+                    <!-- SVG 缩放容器 (viewBox 操控) -->
                     <div id="buildAnimSvgWrapper">
-                        <div id="buildAnimSvgInner">
-                            <svg id="buildAnimSvg"></svg>
-                        </div>
+                        <svg id="buildAnimSvg"></svg>
                     </div>
                     <div class="build-controls">
                         <div class="build-step-indicator" id="buildStepLabel">初始状态 (27个叶子)</div>
@@ -196,12 +194,13 @@
     let buildTimer = null;
     const BUILD_TOTAL = 26;
 
-    // 缩放/拖拽状态
+    // 缩放/拖拽状态 (viewBox 方式)
     let buildZoom = 1;
-    let buildPanX = 0, buildPanY = 0;
+    let viewX = 0, viewY = 0;
+    let baseW = 0, baseH = 0;    // SVG 完整 viewBox 尺寸
     let isDragging = false;
     let dragStartX = 0, dragStartY = 0;
-    let dragPanStartX = 0, dragPanStartY = 0;
+    let dragViewStartX = 0, dragViewStartY = 0;
 
     // 解码动画状态
     let decodeAnimating = false;
@@ -225,6 +224,13 @@
         renderSvgTree(ht, 'svgTree', true);
         renderTextTree(ht);
         renderBuildAnimSvg(ht, 0);  // 初始状态
+        // 记录 SVG 完整 viewBox 尺寸
+        const initVB = document.getElementById('buildAnimSvg').getAttribute('viewBox');
+        if (initVB) {
+            const parts = initVB.split(' ').map(Number);
+            baseW = parts[2];
+            baseH = parts[3];
+        }
         bindEvents();
     });
 
@@ -630,11 +636,10 @@
     }
 
     /* ================================================================
-       构建动画 SVG 缩放/拖拽
+       构建动画 SVG 缩放/拖拽 (viewBox 操控)
        ================================================================ */
     function bindBuildZoomPan() {
         const wrapper = document.getElementById('buildAnimSvgWrapper');
-        const inner = document.getElementById('buildAnimSvgInner');
 
         // 鼠标滚轮缩放（以光标为中心）
         wrapper.addEventListener('wheel', (e) => {
@@ -642,49 +647,49 @@
             const rect = wrapper.getBoundingClientRect();
             const mx = e.clientX - rect.left;
             const my = e.clientY - rect.top;
-            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            const delta = e.deltaY > 0 ? -0.15 : 0.15;
             zoomAtPoint(mx, my, delta);
         }, { passive: false });
 
         // 拖拽平移
         wrapper.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return;  // 只响应左键
+            if (e.button !== 0) return;
             isDragging = true;
             dragStartX = e.clientX;
             dragStartY = e.clientY;
-            dragPanStartX = buildPanX;
-            dragPanStartY = buildPanY;
-            wrapper.style.cursor = 'grabbing';
+            dragViewStartX = viewX;
+            dragViewStartY = viewY;
             e.preventDefault();
         });
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            buildPanX = dragPanStartX + (e.clientX - dragStartX);
-            buildPanY = dragPanStartY + (e.clientY - dragStartY);
-            applyBuildTransform();
+            const wrapper = document.getElementById('buildAnimSvgWrapper');
+            const rect = wrapper.getBoundingClientRect();
+            // 屏幕像素 → SVG 坐标系的转换比例
+            const scaleX = (baseW / buildZoom) / rect.width;
+            const scaleY = (baseH / buildZoom) / rect.height;
+            viewX = dragViewStartX - (e.clientX - dragStartX) * scaleX;
+            viewY = dragViewStartY - (e.clientY - dragStartY) * scaleY;
+            applyViewBox();
         });
 
         document.addEventListener('mouseup', () => {
-            if (!isDragging) return;
             isDragging = false;
-            const wrapper = document.getElementById('buildAnimSvgWrapper');
-            if (wrapper) wrapper.style.cursor = buildZoom === 1 ? 'default' : 'grab';
         });
 
         // 双击重置
-        wrapper.addEventListener('dblclick', () => {
+        wrapper.addEventListener('dblclick', (e) => {
+            e.preventDefault();
             resetBuildZoom();
         });
 
         // 工具栏按钮
         document.getElementById('btnZoomIn').addEventListener('click', () => {
-            const wrapper = document.getElementById('buildAnimSvgWrapper');
             const rect = wrapper.getBoundingClientRect();
             zoomAtPoint(rect.width / 2, rect.height / 2, 0.2);
         });
         document.getElementById('btnZoomOut').addEventListener('click', () => {
-            const wrapper = document.getElementById('buildAnimSvgWrapper');
             const rect = wrapper.getBoundingClientRect();
             zoomAtPoint(rect.width / 2, rect.height / 2, -0.2);
         });
@@ -692,50 +697,67 @@
     }
 
     function zoomAtPoint(mx, my, delta) {
+        const oldZoom = buildZoom;
         const newZoom = Math.max(0.3, Math.min(5, buildZoom + delta));
-        if (newZoom === buildZoom) return;
+        if (newZoom === oldZoom) return;
 
-        // 以 (mx, my) 为中心缩放
-        // 新偏移 = 鼠标位置 - (鼠标位置 - 旧偏移) * (新缩放/旧缩放)
-        buildPanX = mx - (mx - buildPanX) * (newZoom / buildZoom);
-        buildPanY = my - (my - buildPanY) * (newZoom / buildZoom);
+        // 将屏幕坐标 (mx, my) 映射到当前 SVG 坐标
+        const svgX = viewX + (mx / document.getElementById('buildAnimSvgWrapper').getBoundingClientRect().width) * (baseW / oldZoom);
+        const svgY = viewY + (my / document.getElementById('buildAnimSvgWrapper').getBoundingClientRect().height) * (baseH / oldZoom);
+
         buildZoom = newZoom;
-        applyBuildTransform();
+        // 调整 viewBox 原点，使 svgX,svgY 仍对准 mx,my
+        const rect = document.getElementById('buildAnimSvgWrapper').getBoundingClientRect();
+        viewX = svgX - (mx / rect.width) * (baseW / newZoom);
+        viewY = svgY - (my / rect.height) * (baseH / newZoom);
+        clampViewBox();
+        applyViewBox();
         updateZoomUI();
     }
 
-    function applyBuildTransform() {
-        const inner = document.getElementById('buildAnimSvgInner');
-        if (inner) {
-            inner.style.transform = `translate(${buildPanX}px, ${buildPanY}px) scale(${buildZoom})`;
-        }
-        // 更新光标
-        const wrapper = document.getElementById('buildAnimSvgWrapper');
-        if (wrapper && !isDragging) {
-            wrapper.style.cursor = buildZoom > 1.01 || buildZoom < 0.99 ? 'grab' : 'default';
-        }
+    function applyViewBox() {
+        const svg = document.getElementById('buildAnimSvg');
+        if (!svg || baseW === 0) return;
+        const w = baseW / buildZoom;
+        const h = baseH / buildZoom;
+        svg.setAttribute('viewBox', `${viewX} ${viewY} ${w} ${h}`);
+    }
+
+    function clampViewBox() {
+        const w = baseW / buildZoom;
+        const h = baseH / buildZoom;
+        viewX = Math.max(0, Math.min(baseW - w, viewX));
+        viewY = Math.max(0, Math.min(baseH - h, viewY));
     }
 
     function resetBuildZoom() {
         buildZoom = 1;
-        buildPanX = 0;
-        buildPanY = 0;
-        applyBuildTransform();
+        viewX = 0;
+        viewY = 0;
+        applyViewBox();
         updateZoomUI();
-        const wrapper = document.getElementById('buildAnimSvgWrapper');
-        if (wrapper) wrapper.style.cursor = 'default';
     }
 
     function updateZoomUI() {
         document.getElementById('zoomLevelLabel').textContent = Math.round(buildZoom * 100) + '%';
     }
 
-    // 每次重新渲染构建SVG后保持缩放
+    // 每次重新渲染构建SVG后保持缩放状态
     const origRenderBuild = renderBuildAnimSvg;
     renderBuildAnimSvg = function(ht, step) {
         origRenderBuild(ht, step);
-        // 渲染后重新应用缩放变换
-        requestAnimationFrame(() => applyBuildTransform());
+        // 更新 baseW/baseH
+        const svg = document.getElementById('buildAnimSvg');
+        const vb = svg.getAttribute('viewBox');
+        if (vb) {
+            const parts = vb.split(' ').map(Number);
+            baseW = parts[2];
+            baseH = parts[3];
+        }
+        // 如果已缩放，重新应用
+        if (buildZoom !== 1 || viewX !== 0 || viewY !== 0) {
+            requestAnimationFrame(() => applyViewBox());
+        }
     };
 
     /* ================================================================

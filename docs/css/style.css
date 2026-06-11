@@ -252,6 +252,11 @@ body {
     display: block;
 }
 
+/* 构建动画面板不滚动，缩放由内部 wrapper 处理 */
+#buildAnimContainer.tree-view.active {
+    overflow: visible;
+}
+
 /* ============ SVG 树形图 ============ */
 #svgTreeWrapper {
     overflow-x: auto;
@@ -717,22 +722,20 @@ body {
 
 #buildAnimSvgWrapper {
     overflow: hidden;
-    max-height: 420px;
-    text-align: center;
+    height: 420px;
+    cursor: grab;
     position: relative;
-    cursor: default;
+    background: #f8fafc;
+}
+
+#buildAnimSvgWrapper:active {
+    cursor: grabbing;
 }
 
 #buildAnimSvg {
     display: block;
-    margin: 0 auto;
-}
-
-/* 缩放容器 */
-#buildAnimSvgInner {
-    transform-origin: 0 0;
-    transition: none;  /* 缩放时不用过渡，保持即时响应 */
-    display: inline-block;
+    width: 100%;
+    height: 100%;
 }
 
 /* 缩放工具栏 */
